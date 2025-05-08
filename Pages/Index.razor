@@ -1,0 +1,104 @@
+@page "/"
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using System.Text.Json
+@using System.IO
+@inject IJSRuntime JS
+
+<h3 class="text-center fw-bold mb-4">QR Code</h3>
+
+<div class="card shadow p-4 mx-auto" style="max-width: 600px;">
+    <div class="mb-4">
+        <label for="iconUpload" class="form-label fw-semibold">شعار الجهة</label>
+        <InputFile id="iconUpload" OnChange="UploadIcon" class="form-control" />
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">الوحدة</label>
+            <InputText @bind-Value="Unit" class="form-control" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">الاسم</label>
+            <InputText @bind-Value="Name" class="form-control" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">الرقم العسكري</label>
+            <InputText @bind-Value="Number" class="form-control" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">الرتبة</label>
+            <InputText @bind-Value="Rank" class="form-control" />
+        </div>
+        <div class="col-12">
+            <label class="form-label fw-semibold">التخصص</label>
+            <InputText @bind-Value="Specialization" class="form-control" />
+        </div>
+    </div>
+    
+    <div class="text-center mt-4">
+        <button class="btn btn-primary px-4" onclick="@this.GenerateQr">إنشاء رمز QR</button>
+    </div>
+
+    @if (qrGenerated)
+    {
+        <div class="text-center mt-3 d-flex justify-content-center gap-3">
+            <button class="btn btn-success" onclick="@this.DownloadQr">تنزيل</button>
+            <button class="btn btn-secondary" onclick="@this.PrintQr">طباعة</button>
+        </div>
+    }
+   
+</div>
+<div class="text-center mt-4">
+    <div id="qrContainer"></div>
+</div>
+
+
+
+@code {
+    private IBrowserFile iconFile;
+    private string Unit, Name, Number, Rank, Specialization;
+    private bool qrGenerated;
+
+    private string QrImageDataUrl;
+
+    private async Task UploadIcon(InputFileChangeEventArgs e)
+    {
+        iconFile = e.File;
+    }
+
+    private async Task GenerateQr()
+    {
+        var data = new
+        {
+            الشعار = iconFile?.Name,
+            الوحدة = Unit,
+            الاسم = Name,
+            الرقم_العسكري = Number,
+            الرتبة = Rank,
+            التخصص = Specialization
+        };
+
+        using var stream = new MemoryStream();
+        if (iconFile != null)
+        {
+            await iconFile.OpenReadStream().CopyToAsync(stream);
+        }
+        var base64Icon = Convert.ToBase64String(stream.ToArray());
+        var qrTextRaw = $"الاسم: {this.Name}\n" +
+                        $"الرقم العسكري: {this.Number}\n" +
+                        $"الرتبة: {this.Rank}\n" +
+                        $"الوحدة: {this.Unit}\n" +
+                        $"التخصص: {this.Specialization}";
+
+        var qrTextBytes = System.Text.Encoding.UTF8.GetBytes(qrTextRaw);
+        var qrTextBase64 = Convert.ToBase64String(qrTextBytes);
+
+        await JS.InvokeVoidAsync("generateQrWithLogo", qrTextBase64, base64Icon);
+        qrGenerated = true;
+    }
+
+    private async Task DownloadQr() => await JS.InvokeVoidAsync("downloadQr");
+
+    private async Task PrintQr() => await JS.InvokeVoidAsync("printQr");
+}
